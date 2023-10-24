@@ -1,0 +1,337 @@
+---
+title: "Valikuvea hindamine"
+author: "Indrek Soidla"
+institute: "Tartu Ülikool, ühiskonnateaduste instituut"
+date: "2023/10/16 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+
+
+```{r}
+ess10 <- haven::read_spss("data/ess10.sav")
+
+be10 <- ess10 %>% 
+  filter(cntry == "BE")
+
+mean(be10$ppltrst, na.rm = TRUE)
+
+library(TAM)
+be10 %>% 
+  # group_by(region) %>% 
+  summarise(kesk = mean(stfedu, na.rm = TRUE),
+            kesk_kaal = weighted_mean(stfedu, w = dweight),
+            kaal_kesk = mean(dweight, na.rm = TRUE))
+
+be10 %>% 
+  # group_by(region) %>% 
+  summarise(across(starts_with("im"), mean, na.rm = TRUE))
+
+be10 %>% 
+  # group_by(region) %>% 
+  summarise(across(starts_with("im"), weighted_mean, w = dweight))
+
+
+library(meantables)
+
+be10dw <- svydesign(id = ~1, data = be10, weights = ~dweight)
+
+svymean()
+
+ess10 %>% 
+  filter(cntry == "IT") %>% 
+  pull(dweight) %>% 
+  table()
+
+it10 <- ess10 %>% 
+  filter(cntry == "IT")
+
+it10 %>% 
+  # group_by(region) %>% 
+  summarise(across(starts_with("im"), mean, na.rm = TRUE))
+
+it10 %>% 
+  # group_by(region) %>% 
+  summarise(across(starts_with("im"), weighted_mean, w = dweight))
+# stfdem, imueclt
+
+it10none <- svydesign(id = ~1, data = it10, weights = ~1)
+svymean(~imueclt, it10none, na.rm = TRUE) %>% confint()
+
+it10dw <- svydesign(id = ~1, data = it10, weights = ~dweight)
+
+mean(it10$imueclt, na.rm = TRUE)
+svymean(~imueclt, it10dw, na.rm = TRUE) %>% confint()
+
+it10dw_strat <- svydesign(id = ~1, strata = ~stratum, data = it10, weights = ~dweight)
+svymean(~imueclt, it10dw_strat, na.rm = TRUE) %>% confint()
+```
+
+
+```{r}
+indeks <- rnorm(700, mean = 6.1, sd = 1.3) %>% 
+  append(rnorm(700, mean = 3.55, sd = 0.9))
+rahvus <- c(rep("eestlane", 700), rep("mitte-eestlane", 700))
+
+df <- data.frame(indeks, rahvus)
+
+df %>% 
+  group_by(rahvus) %>% 
+  summarise(min(indeks), max(indeks))
+
+ggplot(df, aes(indeks, fill = rahvus)) +
+  geom_density(alpha = 0.5)
+
+mean(df$indeks)
+
+df <- df %>% 
+  mutate(disainikaal = case_when(rahvus == "eestlane" ~ 0.7 / 0.5,
+                                 rahvus == "mitte-eestlane" ~ 0.3 / 0.5))
+
+library(TAM)
+df %>% 
+  summarise(keskm = mean(indeks),
+            keskm_kaalutud = weighted_mean(indeks, w = disainikaal))
+
+df_w <- svydesign(id = ~1, data = df, weights = ~1)
+svymean(~indeks, df_w)
+svymean(~indeks, df_w) %>% confint()
+
+df_w <- svydesign(id = ~1, data = df, weights = ~disainikaal)
+svymean(~indeks, df_w)
+svymean(~indeks, df_w) %>% confint()
+
+df_w_strat <- svydesign(id = ~1, strata = ~rahvus, data = df, weights = ~disainikaal)
+svymean(~indeks, df_w_strat)
+svymean(~indeks, df_w_strat) %>% confint()
+
+
+ess10 %>% filter(cntry == "EE") %>% pull(psu) %>% unique() %>% length()
+ee10 <- ess10 %>% filter(cntry == "EE")
+ee10w <- svydesign(id = ~psu, strata = ~stratum, data = ee10, weights = ~dweight)
+svymean(~agea, ee10w)
+
+pt10 <- ess10 %>% filter(cntry == "PT")
+pt10w <- svydesign(id = ~1, data = pt10, weights = ~dweight)
+svymean(~agea, pt10w, na.rm = TRUE)
+svyby(~agea, ~gndr, design = pt10w, svymean, na.rm = TRUE)
+ess10 %>% 
+  group_by(cntry) %>% 
+  summarise(n = unique(stratum) %>% length()) %>% 
+  print(n = Inf)
+
+si10 <- ess10 %>% filter(cntry == "SI")
+
+si10 %>% 
+  filter(agea <= 23) %>% 
+  mean_table(imbgeco, na.rm = TRUE)
+si10 <- ess10 %>% filter(cntry == "SI")
+si10w <- svydesign(id = ~psu, strata = ~stratum, data = si10, weights = ~dweight)
+si10wo <- svydesign(id = ~1, data = si10, weights = ~dweight)
+svymean(~imbgeco, si10w, na.rm = TRUE) %>% confint()
+
+svyby(~imbgeco, ~I(agea <= 25), design = si10wo, svymean, na.rm = TRUE) %>% confint()
+
+pt10f <- pt10 %>% filter(gndr == 2)
+pt10fw <- svydesign(id = ~psu, strata = ~stratum, data = pt10f, weights = ~dweight)
+svymean(~agea, pt10fw, na.rm = TRUE)
+
+si10 %>% 
+  # group_by(region) %>% 
+  summarise(across(starts_with("im"), mean, na.rm = TRUE))
+
+si10 %>% 
+  # group_by(region) %>% 
+  summarise(across(starts_with("im"), weighted_mean, w = dweight))
+
+ess10 %>% 
+ group_by(cntry) %>% 
+ summarise(n = unique(dweight) %>% length()) %>% 
+ print(n = Inf)
+```
+
+ilma igasuguse kaalumiseta
+```{r}
+si10 %>% 
+  mean_table()
+
+trst1 <- si10 %>% 
+  as_survey_design(ids = 1) %>% 
+  summarise(across(starts_with("trst"), survey_mean, na.rm = TRUE, vartype = "ci"))
+```
+
+disainikaaludega, võtmata arvesse uuringudisaini
+```{r}
+library(srvyr)
+si10 %>% 
+  as_survey_design(ids = 1, weights = dweight) %>% 
+  summarise(ppltrst = survey_mean(ppltrst, na.rm = TRUE, vartype = "ci"))
+
+set1 <- si10 %>% 
+  as_survey_design(ids = 1) %>% 
+  summarise(cntry = unique(cntry),
+            across(starts_with(c("stf", "trst", "im")), survey_mean, na.rm = TRUE, vartype = "ci"))
+
+set2 <- si10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = dweight) %>% 
+  summarise(across(starts_with(c("stf", "trst", "im")), survey_mean, na.rm = TRUE, vartype = "ci"))
+
+bind_rows(set1, set2) %>% 
+  mutate(design = c("nothing", "justweights")) %>% 
+  pivot_longer(cols = !design,
+               names_to = "tunnus",
+               values_to = "vaartus") %>%
+  pivot_wider(names_from = design,
+              values_from = vaartus) %>% 
+  mutate(vahe = nothing - justweights) %>% 
+  arrange(desc(vahe))
+
+means_wo <- function(andmed) { 
+  andmed %>% 
+  as_survey_design(ids = 1) %>% 
+  summarise(across(starts_with(c("stf", "trst", "im")), survey_mean, na.rm = TRUE, vartype = "ci"))
+}
+
+means_full2 <- function(andmed) {
+  andmed %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = dweight, nest = TRUE) %>% 
+  summarise(across(starts_with(c("stf", "trst", "im")), survey_mean, na.rm = TRUE, vartype = "ci"))
+}
+
+means_dw_only <- function(andmed) {
+  andmed %>% 
+  as_survey_design(ids = 1, weights = dweight) %>% 
+  summarise(across(starts_with(c("stf", "trst", "im")), survey_mean, na.rm = TRUE, vartype = "ci"))
+}
+
+ess10_split <- ess10 %>% 
+  select(cntry, starts_with(c("str", "trst", "im")), psu, stratum, dweight, pspwght) %>% 
+  group_split(cntry)
+
+set1 <- map(ess10_split, means_wo) %>% 
+  bind_rows()
+
+set1 <- set1 %>% 
+  mutate(cntry = unique(ess10$cntry))
+
+set1_long <- set1 %>% 
+  pivot_longer(cols = !cntry,
+               names_to = "tunnus",
+               values_to = "vaartus")
+
+set2 <- map(ess10_split, means_full2) %>% 
+  bind_rows()
+
+set2 <- set2 %>% 
+  mutate(cntry = unique(ess10$cntry))
+
+set2_long <- set2 %>% 
+  pivot_longer(cols = !cntry,
+               names_to = "tunnus",
+               values_to = "vaartus")
+
+set12 <- set1_long %>% 
+  full_join(set2_long, by = join_by(cntry, tunnus))
+
+set12 <- set12 %>% 
+  mutate(vahe = vaartus.x - vaartus.y %>% abs()) %>% 
+  arrange(desc(vahe))
+
+head(set12, 100) %>% 
+  print(n = Inf)
+
+set3 <- map(ess10_split, means_dw_only) %>% 
+  bind_rows()
+
+set3 <- set3 %>% 
+  mutate(cntry = unique(ess10$cntry))
+
+set3_long <- set3 %>% 
+  pivot_longer(cols = !cntry,
+               names_to = "tunnus",
+               values_to = "vaartus")
+
+set13 <- set1_long %>% 
+  full_join(set3_long, by = join_by(cntry, tunnus))
+
+set13 <- set13 %>% 
+  mutate(vahe = vaartus.x - vaartus.y %>% abs()) %>% 
+  arrange(desc(vahe))
+
+head(set13, 100) %>% 
+  print(n = Inf)
+
+
+gr10 <- ess10 %>% 
+  filter(cntry == "GR")
+
+mean_ci_none <- gr10 %>% 
+  as_survey_design(ids = 1) %>% 
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_none
+
+mean_ci_dweight <- gr10 %>% 
+  as_survey_design(ids = 1, weights = dweight) %>% 
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_dweight
+
+mean_ci_dweight_svydesign <- gr10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = dweight) %>% 
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_dweight_svydesign
+
+mean_ci_pspwght <- gr10 %>% 
+  as_survey_design(ids = 1, weights = pspwght) %>% 
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_pspwght
+
+mean_ci_pspwght_svydesign <- gr10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = pspwght) %>% 
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_pspwght_svydesign
+
+mean_ci_df <- mean_ci_none %>% 
+  bind_rows(mean_ci_dweight) %>% 
+  bind_rows(mean_ci_dweight_svydesign) %>% 
+  bind_rows(mean_ci_pspwght) %>% 
+  bind_rows(mean_ci_pspwght_svydesign) %>% 
+  mutate(method = c("none", "dweight", "dweight, design", "pspwght", "pspwght, design") %>% as_factor())
+
+ggplot(mean_ci_df, aes(x = trstlgl, y = method)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = trstlgl_low, xmax = trstlgl_upp), width = 0.2)
+
+```
+
+disainikaaludega, uuringudisainiga
+```{r}
+si10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = dweight) %>% 
+  summarise(ppltrst = survey_mean(ppltrst, na.rm = TRUE, vartype = "ci"))
+```
+
+# järelkihistuskaaludega, võtmata arvesse uuringudisaini
+```{r}
+si10 %>% 
+  as_survey_design(ids = 1, weights = pspwght) %>% 
+  summarise(ppltrst = survey_mean(ppltrst, na.rm = TRUE, vartype = "ci"))
+```
+
+järelkihistuskaaludega, uuringudisainiga
+```{r}
+si10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = pspwght) %>% 
+  summarise(ppltrst = survey_mean(ppltrst, na.rm = TRUE, vartype = "ci"))
+```
+

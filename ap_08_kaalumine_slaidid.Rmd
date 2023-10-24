@@ -1,0 +1,308 @@
+---
+title: "Andmete kaalumine, valimidisain"
+author: "Indrek Soidla"
+institute: "Tartu Ülikool, ühiskonnateaduste instituut"
+date: "2023/10/16 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    self_contained: true
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+class: inverse, center, middle
+
+# Andmete kaalumine ebaproportsionaalse kihtvalimi korral
+
+---
+
+## Andmed
+
+- Ebaproportsionaalne kihtvalim: 700 eestlasest vastajat, 700 mitte-eestlasest vastajat
+
+- Indekstunnus hinnang immigratsiooni edukusele Eesti ühiskonnas
+
+```{r eval = FALSE}
+indeks <- rnorm(700, mean = 6.1, sd = 1.3) %>% 
+  append(rnorm(700, mean = 3.55, sd = 0.9))
+rahvus <- c(rep("eestlane", 700), rep("mitte-eestlane", 700))
+
+df <- data.frame(indeks, rahvus)
+
+readr::write_csv(df, "data/naide_ebaprop_kihtvalim.csv")
+```
+
+---
+
+## Andmed
+
+```{r}
+df <- readr::read_csv("data/naide_ebaprop_kihtvalim.csv")
+
+library(tidyverse)
+df %>% 
+  group_by(rahvus) %>% 
+  summarise(min = min(indeks), 
+            max = max(indeks),
+            n = n())
+```
+
+---
+
+## Indeksi jaotus grupiti
+
+```{r}
+ggplot(df, aes(indeks, fill = rahvus)) +
+  geom_density(alpha = 0.5)
+```
+
+## Disainikaalude arvutamine kaasamistõenäosuste põhjal
+
+```{r}
+mean(df$indeks)
+```
+
+- Ebaproportsionaalse kihtvalimi korral ei peegelda kõigi vastajate pealt arvutatud aritmeetiline keskmine selle tegelikku väärtust populatsioonis 
+
+- Vaja arvutada disainikaalud
+
+```{r}
+df <- df %>% 
+  mutate(disainikaal = case_when(rahvus == "eestlane" ~ 0.7 / 0.5,
+                                 rahvus == "mitte-eestlane" ~ 0.3 / 0.5))
+df
+```
+
+---
+
+## Arvutused disainikaaludega
+
+```{r}
+library(TAM)
+df %>% 
+  summarise(keskm = mean(indeks),
+            keskm_kaalutud = weighted_mean(indeks, w = disainikaal))
+```
+
+- Kaalumine on selgelt vajalik
+
+- Lihtsalt andmete läbikaalumine parandab punkthinnanguid (siin aritmeetiline keskmine)
+
+- Järeldava statistika jaoks oleks täpsete tulemuste saamiseks tarvis arvesse võtta ka valikudisaini
+
+- Vaatame, kuidas arvutada keskmisele usalduspiire
+
+---
+
+## Arvutused disainikaaludega
+
+- Keskmine ja usalduspiirid kaalumata
+
+```{r}
+library(srvyr)
+df %>% 
+  as_survey_design(id = 1) %>% 
+  summarise(indeks = survey_mean(indeks, vartype = "ci"))
+```
+
+---
+
+## Arvutused disainikaaludega
+
+- Keskmine ja usalduspiirid disainikaaludega
+
+```{r}
+df %>% 
+  as_survey_design(id = 1, weights = disainikaal) %>% 
+  summarise(indeks = survey_mean(indeks, vartype = "ci"))
+```
+
+---
+
+## Arvutused disainikaaludega
+
+- Keskmine ja usalduspiirid disainikaaludega, arvestades, et tegu on kihtvalimiga
+
+```{r}
+df %>% 
+  as_survey_design(id = 1, strata = rahvus, weights = disainikaal) %>% 
+  summarise(indeks = survey_mean(indeks, vartype = "ci"))
+```
+
+- Usaldusvahemik siin natuke kitsam, sest kihistamine valimi võtmisel suurendab valikutäpsust
+
+---
+
+class: inverse, center, middle
+
+# Andmete kaalumine mitmeastmelise kihistatud valimi korral
+
+## Euroopa Sotsiaaluuringu näitel
+
+---
+
+## Keskmine, kaalumata
+
+- Võtame näiteks ESS 10. laine Kreeka andmed, usaldus õigussüsteemi vastu
+
+- Kreekas kasutati 10. laines  [mitmeastmelist valimit koos kihistamisega](https://ess-search.nsd.no/en/study/172ac431-2a06-41df-9dab-c1fd8f3877e7)
+
+```{r}
+ess10 <- haven::read_spss("data/ess10.sav")
+
+gr10 <- ess10 %>% 
+  filter(cntry == "GR")
+
+mean(gr10$trstlgl, na.rm = TRUE)
+```
+
+---
+
+## Keskmine koos usalduspiiridega, kaalumata
+
+```{r}
+mean_ci_none <- gr10 %>% 
+  as_survey_design(ids = 1) %>% #<<
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_none
+```
+
+---
+
+## Kaalutud disainikaaluga
+
+```{r}
+mean_ci_dweight <- gr10 %>% 
+  as_survey_design(ids = 1, weights = dweight) %>% #<<
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_dweight
+```
+
+---
+
+## Kaalutud disainikaaluga, valimidisain arvestatud
+
+```{r}
+mean_ci_dweight_svydesign <- gr10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = dweight) %>% #<<
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_dweight_svydesign
+```
+
+---
+
+## Kaalutud järelkihistuskaaluga
+
+```{r}
+mean_ci_pspwght <- gr10 %>% 
+  as_survey_design(ids = 1, weights = pspwght) %>% #<<
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_pspwght
+```
+
+See on pmst arvutusviis, mida oleme seni kasutanud:
+
+```{r}
+gr10 %>% 
+  summarise(trstlgl = TAM::weighted_mean(trstlgl, w = pspwght))
+```
+
+---
+
+## Kaalutud järelkihistuskaaluga, valimidisain arvestatud
+
+```{r}
+mean_ci_pspwght_svydesign <- gr10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = pspwght) %>% #<<
+  summarise(trstlgl = survey_mean(trstlgl, na.rm = TRUE, vartype = "ci"))
+mean_ci_pspwght_svydesign
+```
+
+---
+
+## Võrdleme erinevate seadistustega saadud tulemusi
+
+```{r}
+mean_ci_df <- mean_ci_none %>% 
+  bind_rows(mean_ci_dweight) %>% 
+  bind_rows(mean_ci_dweight_svydesign) %>% 
+  bind_rows(mean_ci_pspwght) %>% 
+  bind_rows(mean_ci_pspwght_svydesign) %>% 
+  mutate(method = c("none", "dweight", "dweight, design", "pspwght", "pspwght, design") %>% as_factor())
+mean_ci_df
+```
+
+---
+
+## Paneme tulemused joonisele
+
+```{r mean_ci_df_plot, fig.dim = c(11, 5)}
+ggplot(mean_ci_df, aes(x = trstlgl, y = method)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = trstlgl_low, xmax = trstlgl_upp), width = 0.2) +
+  theme_grey(base_size = 20)
+```
+
+---
+
+class: inverse, center, middle
+
+# Muud tehted
+
+---
+
+## Muud tehted
+
+- Pakettidega `srvyr` ja `survey` koostatud valikudisaini objekte saab kasutada ainult nendes pakettides olevate funktsioonidega
+
+- Näiteks kui soovime arvutada kaalutud tunnuse jaotuse koos usalduspiiridega
+
+```{r}
+gr10_pspwght_svydesign <- gr10 %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = pspwght)
+
+gr10_pspwght_svydesign %>% 
+  group_by(netusoft) %>% 
+  summarise(prop = survey_prop(vartype = "ci"))
+```
+
+---
+
+class: inverse, center, middle
+
+# Harjutused
+
+---
+
+## Harjutus 1
+
+- Millist valikudisaini on kasutatud ESS 10. laine Eesti andmete puhul? Uuri järele ESS andmeportaali dokumentatsioonist
+
+- Kuidas seda valikudisaini seadistada paketis `srvyr` koos järelkihistuskaalu tunnusega?
+
+- Arvutage eelmises punktis seadistatud valikudisaini ja järelkihistuskaalu tunnuse abil tunnuse `imwbcnt` (hinnang sellele, kuidas sisserändajad mõjutavad Eestit elukohana) kaalutud keskmine ja selle usalduspiirid usaldusnivool 95%.
+
+- Kuivõrd erinevad keskmine ja selle usalduspiirid kaalumata ja kaalutud kujul?
+
+---
+
+## Harjutus 2
+
+- Arvutage eelmises harjutuses seadistatud valikudisaini ja järelkihistuskaalu tunnuse abil tunnuse `imwbcnt` keskmised ja usalduspiirid usaldusnivool 95% regiooniti
+
+- Arvutage võrdluseks ka samad näitajad ilma andmeid kaalumata. Kuivõrd erinevad need tulemused on?
+
+```{r echo = FALSE, eval = FALSE}
+ee10 <- ess10 %>% 
+  filter(cntry == "EE")
+
+
+```
+
