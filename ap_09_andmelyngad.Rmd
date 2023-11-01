@@ -1,0 +1,270 @@
+---
+title: "Andmekvaliteedi hindamine, andmelünkade analüüs"
+author: "Indrek Soidla"
+date: "31|10|2023"
+output: 
+  html_document:
+    theme: spacelab
+    highlight: tango
+    fig_cap: true
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Pakettide ja andmete laadimine
+
+Laeme sisse vajalikud paketid.
+
+```{r paketid}
+library(haven)
+library(tidyverse)
+library(summarytools)
+library(naniar)
+library(finalfit)
+```
+
+Laeme sisse Euroopa Sotsiaaluuringu Eesti 9. laine andmed (2018).
+
+```{r ess-andmed}
+ee9 <- read_sav("data/ESS9EE.sav")
+```
+
+Eraldame meile huvipakkuvad tunnused.
+
+```{r andmed}
+andmed <- ee9 %>% 
+  select(stflife, lrscale, imsmetn, imdfetn, impcntr, imbgeco, imueclt, imwbcnt, rlgdgr, brncntr, gndr, agea, eduyrs)
+```
+
+## Põhiline ülevaade andmestiku lünklikkusest
+
+Vaatame andmekirjeldust, et näha, mis tunnused andmestikus on ja millised on nende võimalikud väärtused.
+
+```{r andmekirjeldus}
+str(andmed)
+```
+
+Kõigi tunnuste peale kokku on andmelünki `r andmed %>% is.na() %>% sum()`. 
+
+```{r}
+andmed %>% 
+  is.na() %>% 
+  sum()
+```
+
+Sellest olulisem on aga teada saada, kui suur on indiviidide osakaal, kellel on vähemalt ühes tunnuses andmelünk.
+
+```{r lynkadega-ind-osakaal}
+# Täielikult mõõdetud indiviidide arv:
+andmed %>%
+  complete.cases() %>%
+  sum()
+
+# Andmelünkadega indiviidide arv ehk indiviidide arv, kellel on vähemalt ühes tunnuses andmelünk:
+andmed %>% 
+  complete.cases() %>%
+  `!` %>% # siin võib kasutada ka magrittr::not()
+  sum()
+
+# Andmelünkadega indiviidide osakaal andmestikus:
+andmed %>% 
+  complete.cases() %>%
+  `!` %>% # siin võib kasutada ka magrittr::not()
+  sum() / nrow(andmed)
+```
+
+### Ülevaade lünlikkusest tabelite abil
+
+Uurime lünklikkust veel lähemalt paketi `naniar` funktsioonide abil. Mida näitavad järgnevad kokkuvõtted andmetest?
+
+```{r kokkuvote}
+miss_var_summary(andmed)
+miss_var_table(andmed)
+miss_case_table(andmed)
+miss_case_summary(andmed)
+```
+
+### Tabelid grupiti
+
+`naniar` töötab koostöös `dplyr`iga, nii et saame hõlpsalt esitada samu **kokkuvõtteid grupiti**, nt uurida lünklikkust võrdlevalt meeste ja naiste seas.
+
+```{r naniar-dplyr}
+andmed %>% 
+  group_by(gndr) %>% 
+  miss_var_summary() %>% 
+  print(n = Inf)
+```
+
+See tabel on ülevaatlikum, kui viime ta pikkformaadist laiformaati.
+
+```{r}
+andmed %>% 
+  group_by(gndr) %>% 
+  miss_var_summary() %>% 
+  mutate(gndr = as_factor(gndr)) %>% # et tunnuste nimed oleks laiformaadis selgemad
+  pivot_wider(names_from = gndr,
+              values_from = c(n_miss, pct_miss))
+```
+
+Indiviidide arv ja osakaal lünkade arvu järgi soo lõikes:
+
+```{r}
+andmed %>% 
+  group_by(gndr) %>% 
+  miss_case_table() %>% 
+  print(n = Inf)
+```
+
+## Visuaalne ülevaade lünklikkusest
+
+Pilt ütlevat rohkem kui sada sõna (eeldusel, et oskame pilti adekvaatselt tõlgendada). Teeme siis lünklikkusest kiirema ülevaate saamiseks pilte (st jooniseid). Mida järgneval joonisel kujutatakse?
+
+```{r visuaalne-ylevaade}
+vis_miss(andmed)
+```
+
+### Harjutus 1
+
+Kuidas saaksime eelneva joonise abil hinnata, kas lünklikkus on seotud näiteks vanusega?
+
+```{r}
+
+```
+
+<br>
+
+Mida järgnevatel joonistel kujutatakse?
+
+```{r}
+gg_miss_var(andmed)
+gg_miss_var(andmed, show_pct = TRUE)
+gg_miss_case(andmed)
+
+andmed %>% 
+  mutate(gndr = as_factor(gndr)) %>% 
+gg_miss_var(facet = gndr, show_pct = TRUE)
+
+andmed %>% 
+  mutate(gndr = as_factor(gndr)) %>% 
+gg_miss_fct(fct = gndr)
+```
+
+## Lünklikkuse mustrid
+
+Eeltoodud joonised andsid sama info, mis eelnevalt arvuliselt saadud kokkuvõtted. Jooniste suurem ülevaatlikkus tuleb paremini esile siis, kui uurime lünklikkuse mustreid.
+
+```{r mustrid}
+gg_miss_upset(andmed, nsets = n_var_miss(andmed))
+```
+
+## Harjutus 2
+
+Kui palju täielikult mõõdetud indiviide analüüsi n-ö juurde võidaksime, kui jätaksime välja enesepaigutuse vasak-parem-skaalal?
+
+Kui palju võidaksime juurde täielikult mõõdetud indiviide, kui seejärel jätta välja ka teine kõige suurem lünklikkusega tunnus?
+
+## Lünkade juhuslikkus: visuaalne analüüs
+
+Eelnevast analüüsist saime mõningast aimdust, kas lüngad tunnustes võiksid olla täiesti juhuslikud või mitte. **Uurime tunnuste jaotuseid iga tunnuse lünklikkuse lõikes,** kasutades paketi `finalfit` võimalusi. Et analüüs õnnestuks, tuleb siin tunnuste tüübid korrektselt seadistada, st kategoriaalsed tunnused peaksid olema `factor`-tüüpi (arvulised tunnused on meie andmestikus niikuinii `numeric`-tüüpi). Selleks saab kasutada funktsioone `as.factor` või `as_factor`, aga kasutame siin paketist `sjlabelled` funktsiooni `as_label`, mis teeb sama, aga argumendiga `drop.levels = TRUE` jätab välja kategooriad, mis ei esine ühelgi indiviidil (see võimaldab hiljem väljundtabelid kompaktsemalt esitada). Kaasame praegu ainult need tunnused, kus lünklikkus oli suurem kui 1%, sest joonisele ei mahu liiga palju tunnuseid korraga ära, ning taustatunnused, kus küll lünki polnud, kuid nende tunnuste jaotused võivad siiski olulist infot anda.
+
+```{r}
+andmed <- andmed %>% 
+  mutate(gndr = sjlabelled::as_label(gndr, drop.levels = TRUE),
+         brncntr = sjlabelled::as_label(brncntr, drop.levels = TRUE))
+tunnused_lünklikkus_vis <- c("lrscale", "imbgeco", "imueclt", "imwbcnt", "rlgdgr", "gndr", 
+                              "brncntr", "agea", "eduyrs")
+missing_pairs(andmed, 
+              explanatory = tunnused_lünklikkus_vis)
+```
+
+NB! Karpdiagrammid ei võimalda tunnuse jaotusest head ülevaadet saada, kui eristuvaid väärtuseid on vähe nagu skaalal 0-10 mõõdetud tunnuste puhul. Ka tuleb siniste ja hallide karpdiagrammide võrdlemisel silmas pidada, et enamikus tunnustest on andmelünki suhteliselt vähe (millele viitab hallide alade väiksus enamusel tulpdiagrammidest), nii et suured erinevused sama rea siniste ja hallide karpdiagrammide vahel võivad tuleneda hoopis juhuslikkusest. Teeme kohe ka mõned statistilised testid, et jälile jõuda, kas see nii võib olla, aga enne vaatame, mida siiski neist diagrammidest lünkade juhuslikkuse kohta järeldada saaksime. 
+
+Kategoriaalsete tunnuste puhul on lünklikkuse võrdlemine kategooriate lõikes ülevaatlikum, kui tulpade kõrgused on võrreldavad. Teeme selleks veidi muudetud joonise, kuigi ka eelmine versioon võib olla oluline, et märgata, kui mõnes kategoorias on väga vähe indiviide.
+
+```{r}
+missing_pairs(andmed, 
+              explanatory = tunnused_lünklikkus_vis, 
+              position = "fill")
+```
+
+Mida jooniselt välja lugeda saame?
+
+## Lünkade juhuslikkus: jaotus(parameetri)te võrdlus, statistilised testid
+
+Vaatame lähemalt, **kas vasak-parem-skaalal enesepaigutuse tunnuses esinev lünklikkus on täiesti juhuslik või mitte.** Kasutades paketist `finalfit` funktsiooni `missing_compare`, arvutame teiste arvuliste tunnuste keskmised indiviidide seas, kellel on vasak-parem-skaala tunnuses valiidsed väärtused, ja nende seas, kellel on selles tunnuses andmelünk. Kategoriaalsete tunnuste puhul teeme risttabeli. Lisaks hinnatakse jaotuste erinevust statistiliste testidega. Milliste statistiliste testidega? Uuri funktsiooni abifaili, trükkides konsooli `?missing_compare`.
+
+```{r}
+andmed <- andmed %>% 
+  mutate(across(imsmetn:impcntr, sjlabelled::as_label, drop.levels = TRUE))
+tunnused_lünklikkus_test <- c("imsmetn", "imdfetn", "impcntr", "imbgeco", 
+                                "imueclt", "imwbcnt", "rlgdgr", "gndr",
+                                "brncntr", "agea", "eduyrs")
+missing_compare(andmed, 
+                dependent = "lrscale", 
+                explanatory = tunnused_lünklikkus_test) %>% 
+  knitr::kable(row.names=FALSE, align = c("l", "l", "r", "r", "r"))
+```
+
+Mida tulemustest järeldada saame?
+
+## Harjutus 3
+
+Uuri ise, kas immigratsiooni tajutud mõju majandusele mõõtvas tunnuses `imbgeco` esinevad lüngad täiesti juhuslikult (MCAR) või mitte.
+
+```{r imbgeco-lynklikkus}
+
+```
+
+Mida ütlevad hoiatusteated? Tuleta meelde hii-ruut-testi eeldusi.
+
+Mida tulemustest järeldad?
+
+Kui vaadata usklikkust lünkade esinemise suhtes vasak-parem-skaala tunnuses ja nüüd usklikkust lünkade esinemise suhtes immigratsiooni mõju hinnangute tunnuses, siis erinevused usklikkuses on keskmiselt samad. Siiski on eelmises tabelis näha, et nt olulisuse nivool 0.05 oli erinevus statistiliselt oluline, `imbgeco` lünklikkuse puhul aga mitte. Kuidas nii? Kuidas siis peaks neid tulemusi tõlgendada?
+
+Kuidas üleüldse neid statistiliste testide tulemusi tõlgendada, kui statistilise testi eesmärk on teada saada, kas mingit erinevuse või seose esinemist saab väita mitte ainult valimis, vaid ka populatsioonis? Saab ju andmete lünklikkus esineda ainult valimis ehk küsitlusandmetes, mitte populatsioonis.
+
+## Lünklikkus andmestikus tervikuna
+
+Eelnev analüüs võimaldab saada üsna üksikasjaliku pildi sellest, kas ja millised tunnused on seotud lünklikkusega mingis tunnuses ja mille tõttu võivad lüngad olla andmetesse tekkinud. See on oluline info sisulisema analüüsi, mis tavaliselt andmekvaliteedi hindamisele järgneb, tulemuste tõlgendamiseks. 
+
+Samas on ka oluline **hinnata analüüsitavate tunnuste komplekti kui terviku lünklikkust** ehk kas need indiviidid, kellel oli vähemalt ühes tunnuses andmelünk, erinevad kuidagi täielikult mõõdetud indiviididest. See on oluline, sest kui me mingeid omistamismeetodeid ei kasuta, siis tuleb mitmemõõtmelises analüüsis kõik sellised indiviidid analüüsist välja jätta. 
+
+Teeme indikaatortunnuse, mis näitab täielike vastustega indiviidide ja andmelünkadega indiviidide osakaalu andmestikus.
+
+```{r}
+andmed <- andmed %>% 
+  add_any_miss() %>% 
+  replace_with_na(replace = list(any_miss_all = "missing"))
+```
+
+Uurime, kas need kaks gruppi erinevad teiste tunnuste jaotuste poolest.
+
+```{r}
+missing_pairs(andmed, 
+              explanatory = c("lrscale", "imbgeco", "imueclt", "imwbcnt", "rlgdgr", "gndr", 
+                              "brncntr", "agea", "eduyrs", "any_miss_all"), 
+              position = "fill")
+
+missing_compare(andmed, 
+                dependent = "any_miss_all", 
+                explanatory = c("lrscale", "imsmetn", "imdfetn", "impcntr", 
+                                "imbgeco", "imueclt", "imwbcnt", "rlgdgr", 
+                                "gndr", "brncntr", "agea", "eduyrs")) %>% 
+  knitr::kable(row.names=FALSE, align = c("l", "l", "r", "r", "r"))
+```
+
+Nagu arvata oli, on erinevused üsna selged. Seega ei saa siin rääkida lünkade täielikust juhuslikkusest, mis tähendab, et kui jätaksime lünkadega indiviidid analüüsist lihtsalt välja (mis paraku on vältimatu, kui me ei kasuta mitmest imputeerimist vm sarnast meetodit lünkade täitmiseks), siis tuleks tulemuste tõlgendamisel kindlasti arvesse võtta, kuidas lünkadega indiviidide eemaldamine tulemusi ja tulemuste esinduslikkust võib mõjutada.
+
+## Harjutus 4
+
+Nagu eelnevalt nägime, on suurel osal lünkadega indiviididest ainult üks lünk, mis on tunnuses `lrscale`. Kas andmete esinduslikkus paraneks, kui jätaksime selle tunnuse analüüsist välja (ja seega kasvaks täielikult mõõdetud indiviidide hulk)? Püüdke eelnevat koodijuppi kasutades sellele jälile jõuda.
+
+```{r}
+
+```
+

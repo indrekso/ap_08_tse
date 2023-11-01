@@ -146,7 +146,7 @@ class: center, middle, inverse, title-slide
 ### Tartu Ülikool, ühiskonnateaduste instituut
 ]
 .date[
-### 2023/10/16 (updated: 2023-10-24)
+### 2023/10/16 (updated: 2023-10-25)
 ]
 
 ---
@@ -579,11 +579,76 @@ class: inverse, center, middle
 
 ---
 
+## Harjutus 1
+
+
+```r
+library(tidyverse)
+ee10 &lt;- haven::read_spss(&quot;data/ess10.sav&quot;) %&gt;% 
+  filter(cntry == &quot;EE&quot;)
+
+library(srvyr)
+ee10 %&gt;% 
+  as_survey_design(ids = 1, strata = stratum, weights = pspwght) %&gt;% 
+  summarise(imwbcnt = survey_mean(imwbcnt, na.rm = TRUE, vartype = &quot;ci&quot;))
+```
+
+```
+## # A tibble: 1 × 3
+##   imwbcnt imwbcnt_low imwbcnt_upp
+##     &lt;dbl&gt;       &lt;dbl&gt;       &lt;dbl&gt;
+## 1    4.95        4.84        5.07
+```
+
+---
+
+## Harjutus 1
+
+
+```r
+ee10 %&gt;% 
+  as_survey_design(ids = 1) %&gt;% 
+  summarise(imwbcnt = survey_mean(imwbcnt, na.rm = TRUE, vartype = &quot;ci&quot;))
+```
+
+```
+## # A tibble: 1 × 3
+##   imwbcnt imwbcnt_low imwbcnt_upp
+##     &lt;dbl&gt;       &lt;dbl&gt;       &lt;dbl&gt;
+## 1    4.87        4.76        4.99
+```
+
+```r
+ee10 %&gt;% 
+  as_survey_design(ids = 1, weights = pspwght) %&gt;% 
+  summarise(imwbcnt = survey_mean(imwbcnt, na.rm = TRUE, vartype = &quot;ci&quot;))
+```
+
+```
+## # A tibble: 1 × 3
+##   imwbcnt imwbcnt_low imwbcnt_upp
+##     &lt;dbl&gt;       &lt;dbl&gt;       &lt;dbl&gt;
+## 1    4.95        4.84        5.07
+```
+
+
+---
+
 ## Harjutus 2
 
 - Arvutage eelmises harjutuses seadistatud valikudisaini ja järelkihistuskaalu tunnuse abil tunnuse `imwbcnt` keskmised ja usalduspiirid usaldusnivool 95% regiooniti
 
 - Arvutage võrdluseks ka samad näitajad ilma andmeid kaalumata. Kuivõrd erinevad need tulemused on?
+
+
+
+&lt;!-- Arvutage paketi srvyr abiga Euroopa Sotsiaaluuringu Suurbritannia 10. laine andmete põhjal tunnuse impcntr (hinnang selle kohta, kui palju sisserändajaid peaks Suurbritanniasse lubama vaesematest riikidest väljastpoolt Euroopat) protsentjaotus koos protsentnäitajate usalduspiiridega, võttes arvesse valikudisaini ja kaaludes andmeid järelkihistuskaalu tunnusega. --&gt;
+
+&lt;!-- Mis tüüpi valimiga on Suurbritannia puhul tegu? Millised argumendid peaksid R-s valikudisaini seadistamisel kirjas olema?  --&gt;
+
+&lt;!-- Kui suureks saab hinnata nende inimeste osakaalu Suurbritannias, kes ei lubaks riiki ühtegi sisserändajat? Kui andmeid mitte kaaluda, siis millise vastuse andnud indiviidid oleksid alaesindatud? --&gt;
+
+&lt;!-- Esitage lahendus kas Rmarkdowni abil loodud html-failina (kood + väljund + vastused ülal esitatud küsimustele) või kopeerige lahendusse kood ja vastused ülal olevatele küsimustele ja lisage kuvatõmmis väljundist. Lisapunkte annab lahenduse Rmarkdowni abil esitamine ja protsentnäitajate/usalduspiiride visualiseerimine. --&gt;
 
 
 

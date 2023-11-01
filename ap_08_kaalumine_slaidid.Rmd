@@ -293,6 +293,36 @@ class: inverse, center, middle
 
 ---
 
+## Harjutus 1
+
+```{r}
+library(tidyverse)
+ee10 <- haven::read_spss("data/ess10.sav") %>% 
+  filter(cntry == "EE")
+
+library(srvyr)
+ee10 %>% 
+  as_survey_design(ids = 1, strata = stratum, weights = pspwght) %>% 
+  summarise(imwbcnt = survey_mean(imwbcnt, na.rm = TRUE, vartype = "ci"))
+```
+
+---
+
+## Harjutus 1
+
+```{r}
+ee10 %>% 
+  as_survey_design(ids = 1) %>% 
+  summarise(imwbcnt = survey_mean(imwbcnt, na.rm = TRUE, vartype = "ci"))
+
+ee10 %>% 
+  as_survey_design(ids = 1, weights = pspwght) %>% 
+  summarise(imwbcnt = survey_mean(imwbcnt, na.rm = TRUE, vartype = "ci"))
+```
+
+
+---
+
 ## Harjutus 2
 
 - Arvutage eelmises harjutuses seadistatud valikudisaini ja järelkihistuskaalu tunnuse abil tunnuse `imwbcnt` keskmised ja usalduspiirid usaldusnivool 95% regiooniti
@@ -300,9 +330,41 @@ class: inverse, center, middle
 - Arvutage võrdluseks ka samad näitajad ilma andmeid kaalumata. Kuivõrd erinevad need tulemused on?
 
 ```{r echo = FALSE, eval = FALSE}
-ee10 <- ess10 %>% 
-  filter(cntry == "EE")
+ee10 %>% 
+  as_survey_design(ids = 1, strata = stratum, weights = pspwght) %>% 
+  group_by(region) %>% 
+  summarise(imwbcnt = survey_mean(imwbcnt, na.rm = TRUE, vartype = "ci"))
 
+ee10 %>% 
+  as_survey_design(ids = 1) %>% 
+  group_by(region) %>% 
+  summarise(keskmised = survey_mean(imwbcnt, na.rm = TRUE, vartype = "ci"))
+```
 
+<!-- Arvutage paketi srvyr abiga Euroopa Sotsiaaluuringu Suurbritannia 10. laine andmete põhjal tunnuse impcntr (hinnang selle kohta, kui palju sisserändajaid peaks Suurbritanniasse lubama vaesematest riikidest väljastpoolt Euroopat) protsentjaotus koos protsentnäitajate usalduspiiridega, võttes arvesse valikudisaini ja kaaludes andmeid järelkihistuskaalu tunnusega. -->
+
+<!-- Mis tüüpi valimiga on Suurbritannia puhul tegu? Millised argumendid peaksid R-s valikudisaini seadistamisel kirjas olema?  -->
+
+<!-- Kui suureks saab hinnata nende inimeste osakaalu Suurbritannias, kes ei lubaks riiki ühtegi sisserändajat? Kui andmeid mitte kaaluda, siis millise vastuse andnud indiviidid oleksid alaesindatud? -->
+
+<!-- Esitage lahendus kas Rmarkdowni abil loodud html-failina (kood + väljund + vastused ülal esitatud küsimustele) või kopeerige lahendusse kood ja vastused ülal olevatele küsimustele ja lisage kuvatõmmis väljundist. Lisapunkte annab lahenduse Rmarkdowni abil esitamine ja protsentnäitajate/usalduspiiride visualiseerimine. -->
+
+```{r echo = FALSE, eval = FALSE}
+ess10 %>% 
+  filter(cntry == "GB") %>% 
+  as_survey_design() %>% 
+  # drop_na(impcntr) %>% 
+  group_by(impcntr) %>% 
+  summarise(prop = survey_prop(vartype = "ci"))
+
+ess10 %>% 
+  filter(cntry == "GB") %>% 
+  as_survey_design(ids = psu, strata = stratum, weights = pspwght) %>% 
+  # drop_na(impcntr) %>% 
+  group_by(impcntr) %>% 
+  summarise(prop = survey_prop(vartype = "ci")) %>% 
+  ggplot(aes(x = prop, y = as_factor(impcntr))) +
+  geom_point() +
+  geom_errorbar(aes(xmin = prop_low, xmax = prop_upp), width = 0.2)
 ```
 
